@@ -1,25 +1,28 @@
-import { supabase } from "@/lib/supabase";
-import { NextResponse } from "next/server";
-import { cookies } from 'next/headers';
-import bcrypt from "bcryptjs";
+import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
-    const { data: user, error } = await supabase.from('users').select('*').eq('email', email).single();
+    const { username, password } = await req.json();
 
-    if (error || !user) return NextResponse.json({ message: "ไม่พบผู้ใช้" }, { status: 401 });
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .eq('password', password)
+      .single();
 
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) return NextResponse.json({ message: "รหัสผ่านผิด" }, { status: 401 });
+    if (error || !user) {
+      return NextResponse.json({ message: 'Username หรือรหัสผ่านไม่ถูกต้อง' }, { status: 401 });
+    }
 
-    // สร้าง Cookie เพื่อเป็นกุญแจให้ Middleware ตรวจสอบ
-// เปลี่ยนจาก cookies().set(...) เป็นแบบนี้:
-const cookieStore = await cookies();
-cookieStore.set('isLoggedIn', 'true', { maxAge: 60 * 60 * 24, path: '/' });
-
-    return NextResponse.json({ user: { name: user.name } });
-  } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    return NextResponse.json({ user });
+  } catch (err) {
+    return NextResponse.json({ message: 'Server Error' }, { status: 500 });
   }
 }
