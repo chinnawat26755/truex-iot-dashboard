@@ -1,7 +1,8 @@
 import { HfInference } from "@huggingface/inference";
 import { NextResponse } from "next/server";
 
-const hf = new HfInference("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");
+// เปลี่ยนจากของเดิมที่เป็น string ยาวๆ เป็นแบบนี้
+const hf = new HfInference(process.env.HF_TOKEN);
 
 export async function POST(req: Request) {
   try {
