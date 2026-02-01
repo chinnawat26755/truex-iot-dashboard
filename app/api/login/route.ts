@@ -18,11 +18,13 @@ export async function POST(req: Request) {
       .single();
 
     if (error || !user) {
-      return NextResponse.json({ message: 'Username หรือรหัสผ่านไม่ถูกต้อง' }, { status: 401 });
+      return NextResponse.json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' }, { status: 401 });
     }
 
+    // ส่งข้อมูลผู้ใช้กลับไป
     return NextResponse.json({ user });
   } catch (err) {
-    return NextResponse.json({ message: 'Server Error' }, { status: 500 });
+    console.error('Login API Error:', err);
+    return NextResponse.json({ message: 'เกิดข้อผิดพลาดที่เซิร์ฟเวอร์' }, { status: 500 });
   }
 }

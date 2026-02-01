@@ -57,9 +57,15 @@ export default function Dashboard() {
   };
 
   const logout = () => {
-    document.cookie = "isLoggedIn=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    router.push('/login');
-  };
+  // 1. ล้างข้อมูลใน localStorage
+  localStorage.removeItem('userName');
+  
+  // 2. ลบ Cookie ทิ้งทันที
+  document.cookie = "isLoggedIn=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+  
+  // 3. กลับไปหน้า Login
+  window.location.href = '/login';
+};
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
