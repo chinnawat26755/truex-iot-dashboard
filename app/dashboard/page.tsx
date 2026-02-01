@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-// ⚡ ข้อที่ 1: Client-side Caching (เก็บข้อมูลสภาพอากาศไว้ 5 นาที เพื่อความเร็วสูงสุด)
+// ⚡ ข้อที่ 1: Client-side Caching (เก็บข้อมูลไว้ 5 นาที เพื่อความเร็วสูงสุด)
 let weatherCache: { data: any, timestamp: number } | null = null;
 const CACHE_DURATION = 5 * 60 * 1000; 
 
@@ -16,15 +16,16 @@ export default function Dashboard() {
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
 
-  // 🎨 ฟังก์ชันเลือกสีและสไตล์ตามค่า AQI (Visual Insights)
+  // 🎨 ข้อที่ 2: Visual Insights (เปลี่ยนสีตามค่า AQI มาตรฐานสากล)
   const aqiStyle = useMemo(() => {
+    if (aqi === 0) return { dot: "bg-slate-300", text: "text-slate-400", bg: "bg-white", border: "border-slate-100", label: "กำลังโหลดข้อมูล..." };
     if (aqi <= 50) return { dot: "bg-green-500", text: "text-green-500", bg: "bg-green-50", border: "border-green-100", label: "อากาศดีมาก" };
     if (aqi <= 100) return { dot: "bg-yellow-500", text: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-100", label: "คุณภาพอากาศปานกลาง" };
     if (aqi <= 150) return { dot: "bg-orange-500", text: "text-orange-500", bg: "bg-orange-50", border: "border-orange-100", label: "เริ่มมีผลกระทบต่อสุขภาพ" };
     return { dot: "bg-red-500", text: "text-red-600", bg: "bg-red-50", border: "border-red-100", label: "อันตรายต่อสุขภาพ" };
   }, [aqi]);
 
-  // ⚡ ข้อที่ 2: Memoization นาฬิกา (แยกออกมาไม่ให้ Re-render ทั้งหน้า)
+  // ⚡ ข้อที่ 3: Memoization นาฬิกา (แยกออกมาไม่ให้ Re-render ทั้งหน้า)
   useEffect(() => {
     setIsMounted(true);
     const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -35,7 +36,7 @@ export default function Dashboard() {
     return currentTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
   }, [currentTime]);
 
-  // ฟังก์ชันดึงข้อมูลพิกัดและสภาพอากาศ (ใช้ Cache)
+  // ฟังก์ชันดึงข้อมูลที่มีระบบ Cache และเรียกจาก OpenWeather หลังบ้าน
   const fetchData = useCallback(async () => {
     const now = Date.now();
     if (weatherCache && (now - weatherCache.timestamp < CACHE_DURATION)) {
@@ -58,14 +59,14 @@ export default function Dashboard() {
             setWeather(result.weather);
             setAqi(result.aqi);
           }
-        } catch (err) { console.error("Weather Fetch Error:", err); }
+        } catch (err) { console.error("Fetch Error:", err); }
       }, () => {
-        // แผนสำรอง (Default Bangkok)
+        // Default: Bangkok
         fetch(`/api/weather?lat=13.75&lon=100.50`).then(r => r.json()).then(data => {
           setWeather({ temp: data.temp.toString(), desc: data.desc, city: data.city + " (Default)" });
           setAqi(data.aqi || 0);
         });
-      }, { enableHighAccuracy: true, timeout: 10000 });
+      });
     }
   }, []);
 
@@ -88,7 +89,7 @@ export default function Dashboard() {
       const data = await res.json();
       setAiAdvice(data.analysis || "วิเคราะห์เสร็จสิ้นครับ");
     } catch (err) { 
-      setAiAdvice("ขออภัย ระบบขัดข้องชั่วคราว"); 
+      setAiAdvice("ขออภัย ระบบ AI ขัดข้องชั่วคราว"); 
     } finally { 
       setIsLoading(false); 
     }
@@ -104,7 +105,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 transition-all duration-700">
-      {/* Navigation Bar */}
       <nav className="bg-white p-3 md:p-5 border-b flex justify-between items-center shadow-sm sticky top-0 z-20">
         <div className="flex items-center gap-3 md:gap-6">
           <h1 className="text-xl md:text-2xl font-black text-red-600 italic tracking-tighter">TrueX</h1>
@@ -130,8 +130,8 @@ export default function Dashboard() {
 
       <main className="max-w-6xl mx-auto p-4 md:p-10 grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
         <div className="md:col-span-2 space-y-6">
-          {/* AQI Dynamic Card: เปลี่ยนสีตามค่า AQI */}
-          <div className={`p-8 md:p-10 rounded-[2rem] shadow-sm border transition-all duration-500 relative overflow-hidden ${aqiStyle.bg} ${aqiStyle.border}`}>
+          {/* ⚡ AQI Dynamic Card: เปลี่ยนสีตามค่า AQI ที่คำนวณจาก OpenWeather */}
+          <div className={`p-8 md:p-10 rounded-[2rem] shadow-sm border transition-all duration-700 relative overflow-hidden ${aqiStyle.bg} ${aqiStyle.border}`}>
             <div className={`absolute top-0 right-0 w-2 h-full ${aqiStyle.dot}`}></div>
             <h2 className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em] italic mb-4">Live Air Quality Index</h2>
             <div className="flex items-baseline gap-4 mt-2">
@@ -141,7 +141,7 @@ export default function Dashboard() {
                   <span className={`w-3 h-3 rounded-full ${aqiStyle.dot} animate-pulse`}></span>
                   {aqiStyle.label}
                 </span>
-                <span className="text-slate-400 text-[10px] italic underline">TrueX Sensor Optimized</span>
+                <span className="text-slate-400 text-[10px] italic underline italic">Unlimited API Active</span>
               </div>
             </div>
           </div>
@@ -151,7 +151,7 @@ export default function Dashboard() {
             disabled={isLoading} 
             className="w-full bg-red-600 text-white p-6 md:p-8 rounded-[1.5rem] font-black text-lg md:text-xl shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:bg-slate-300"
           >
-            {isLoading ? "ANALYZING BY TRUEX AI..." : "ANALYZE WITH TRUEX AI"}
+            {isLoading ? "ANALYZING..." : "ANALYZE WITH TRUEX AI"}
           </button>
         </div>
 
