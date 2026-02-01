@@ -18,53 +18,55 @@ export default function Dashboard() {
     
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
 
-    const fetchData = async (lat: number, lon: number) => {
-      try {
-        const [wRes, aRes] = await Promise.all([
-          fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&appid=09877d3354adce4648b6a4c92a8d397b`),
-          fetch(`https://api.airvisual.com/v2/nearest_city?lat=${lat}&lon=${lon}&key=29e298ea-da23-4bc1-9a3f-6739c119f466`)
-        ]);
+    const fetchData = async () => {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          const { latitude: lat, longitude: lon } = position.coords;
+          
+          try {
+            const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+            const data = await res.json();
 
-        const wData = await wRes.json();
-        const aData = await aRes.json();
-
-        if (wData.main) {
-          setWeather({ 
-            temp: Math.round(wData.main.temp).toString(), 
-            desc: wData.weather[0].main,
-            city: wData.name 
-          });
-        }
-        if (aData.status === "success") {
-          setAqi(aData.data.current.pollution.aqius);
-        }
-      } catch (err) { 
-        console.error("API Error:", err); 
+            // ✅ เช็คความปลอดภัย: ข้อมูลต้องมีอยู่จริงก่อนสั่ง toString()
+            if (res.ok && data.temp !== undefined) {
+              setWeather({ 
+                temp: data.temp.toString(), 
+                desc: data.desc || "Unknown",
+                city: data.city || "Location Found" 
+              });
+              setAqi(data.aqi || 0);
+            }
+          } catch (err) { 
+            console.error("Client Fetch Error:", err); 
+          }
+        }, (error) => {
+          console.error("Location Error:", error.message);
+          
+          // 🛡️ แผนสำรองแบบปลอดภัย (Default Bangkok)
+          fetch(`/api/weather?lat=13.75&lon=100.50`)
+            .then(r => r.json())
+            .then(data => {
+              // ตรวจสอบข้อมูลสำรองป้องกันเครื่องค้าง
+              const safeTemp = (data && data.temp !== undefined) ? data.temp.toString() : "--";
+              setWeather({ 
+                temp: safeTemp, 
+                desc: data.desc || "No Data", 
+                city: (data.city || "Bangkok") + " (Default)" 
+              });
+              setAqi(data.aqi || 0);
+            })
+            .catch(err => console.error("Backup Fetch Error:", err));
+        }, { enableHighAccuracy: true, timeout: 10000 });
       }
     };
 
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          fetchData(position.coords.latitude, position.coords.longitude);
-        },
-        (error) => {
-          console.error("Geolocation Error:", error.message);
-          // 📍 แผนสำรอง: ถ้าดึงพิกัดไม่ได้ ให้ดึงข้อมูลของกรุงเทพฯ (Bangkok) แทน
-          // พิกัด กทม: lat 13.7563, lon 100.5018
-          fetchData(13.7563, 100.5018);
-          setWeather(prev => ({ ...prev, city: "Bangkok (Default)" }));
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
-
+    fetchData();
     return () => clearInterval(timer);
   }, []);
 
   const handleAnalyze = async () => {
     setIsLoading(true);
-    setAiAdvice("TrueX AI กำลังวิเคราะห์ข้อมูลสภาพอากาศ...");
+    setAiAdvice("TrueX AI กำลังประมวลผลข้อมูลจากพิกัดปัจจุบัน...");
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
@@ -118,7 +120,7 @@ export default function Dashboard() {
               </span>
             </div>
           </div>
-          <button onClick={logout} className="bg-red-600 hover:bg-red-700 text-white text-[10px] md:text-xs font-black px-3 md:px-5 py-2 rounded-xl shadow-lg shadow-red-100 active:scale-90 transition-all uppercase tracking-wider">
+          <button onClick={logout} className="bg-red-600 hover:bg-red-700 text-white text-[10px] md:text-xs font-black px-3 md:px-5 py-2 rounded-xl shadow-lg active:scale-90 transition-all uppercase">
             Logout
           </button>
         </div>
@@ -128,21 +130,22 @@ export default function Dashboard() {
         <div className="md:col-span-2 space-y-6">
           <div className="bg-white p-8 md:p-10 rounded-[2rem] md:rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-2 h-full bg-red-600"></div>
-            <h2 className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em] italic mb-4">Indoor Air Monitoring</h2>
+            <h2 className="text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em] italic mb-4">Live Air Quality Index</h2>
             <div className="flex items-baseline gap-4 mt-2">
               <span className="text-7xl md:text-9xl font-black text-slate-800 leading-none">{aqi}</span>
               <div className="flex flex-col">
                 <span className={`font-bold text-lg md:text-xl ${aqi <= 50 ? 'text-green-500' : 'text-orange-500'}`}>
-                  ● {aqi <= 50 ? 'คุณภาพอากาศดี' : 'ควรเฝ้าระวัง'}
+                  ● {aqi <= 50 ? 'อากาศดี' : 'ต้องเฝ้าระวัง'}
                 </span>
-                <span className="text-slate-400 text-[10px] italic mt-1 underline">Location Active</span>
+                <span className="text-slate-400 text-[10px] italic mt-1 underline">Secure Location Active</span>
               </div>
             </div>
           </div>
+          
           <button 
             onClick={handleAnalyze}
             disabled={isLoading}
-            className="w-full bg-red-600 text-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] font-black text-lg md:text-xl shadow-xl shadow-red-200 hover:bg-red-700 transition-all active:scale-95 disabled:bg-slate-300"
+            className="w-full bg-red-600 text-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] font-black text-lg md:text-xl shadow-xl hover:bg-red-700 transition-all active:scale-95 disabled:bg-slate-300"
           >
             {isLoading ? "Analyzing..." : "Analyze with TrueX AI"}
           </button>
@@ -151,7 +154,7 @@ export default function Dashboard() {
         <div className="bg-red-600 p-8 md:p-10 rounded-[2rem] md:rounded-[2.5rem] text-white flex flex-col justify-between shadow-2xl min-h-[350px] md:min-h-[450px] relative overflow-hidden border border-white/10 shadow-red-300">
           <div className="text-5xl md:text-6xl opacity-20 italic font-serif">“</div>
           <div className="z-10 relative">
-            <h3 className="text-[10px] font-bold opacity-60 mb-2 tracking-[0.3em] uppercase italic border-b border-white/20 pb-2">TrueX Smart Insight</h3>
+            <h3 className="text-[10px] font-bold opacity-60 mb-2 tracking-[0.3em] uppercase italic border-b border-white/20 pb-2">Smart IoT Insight</h3>
             <p className="text-lg md:text-xl font-medium leading-relaxed mt-4 drop-shadow-md">{aiAdvice}</p>
           </div>
           <div className="mt-8 flex gap-2 h-10 md:h-14 items-end">
