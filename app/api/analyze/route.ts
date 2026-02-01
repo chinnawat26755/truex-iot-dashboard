@@ -1,7 +1,7 @@
 import { HfInference } from "@huggingface/inference";
 import { NextResponse } from "next/server";
 
-// เปลี่ยนจากของเดิมที่เป็น string ยาวๆ เป็นแบบนี้
+// ระบบจะดึง HF_TOKEN จากไฟล์ .env.local มาใช้
 const hf = new HfInference(process.env.HF_TOKEN);
 
 export async function POST(req: Request) {
@@ -21,11 +21,14 @@ export async function POST(req: Request) {
         { role: "user", content: userQuestion || "ช่วยวิเคราะห์สถานะอากาศจากตำแหน่งปัจจุบันของฉันหน่อย" }
       ],
       max_tokens: 250,
-      temperature: 0.6,
+      temperature: 0.7, // ปรับให้คำตอบมีความหลากหลายขึ้นนิดหน่อย
     });
 
-    return NextResponse.json({ analysis: response.choices[0].message.content });
+    const aiMessage = response.choices[0].message.content;
+
+    return NextResponse.json({ analysis: aiMessage });
   } catch (error: any) {
+    console.error("AI API Error:", error);
     return NextResponse.json({ message: "AI Connection Error" }, { status: 500 });
   }
 }
