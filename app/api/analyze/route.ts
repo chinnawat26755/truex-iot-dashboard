@@ -1,34 +1,35 @@
 import { HfInference } from "@huggingface/inference";
 import { NextResponse } from "next/server";
 
-// ระบบจะดึง HF_TOKEN จากไฟล์ .env.local มาใช้
 const hf = new HfInference(process.env.HF_TOKEN);
 
 export async function POST(req: Request) {
   try {
-    const { aqi, temp, userQuestion } = await req.json();
+    const { aqi, temp } = await req.json();
 
-    const systemContext = `
-      คุณคือ TrueX AI ระบบวิเคราะห์ IoT อัจฉริยะ (Smart Home Assistant)
-      ข้อมูลปัจจุบันที่คุณได้รับจากเซนเซอร์: ค่าฝุ่น AQI = ${aqi}, อุณหภูมิ = ${temp}°C
-      หน้าที่: วิเคราะห์ความสัมพันธ์ของสภาพอากาศและตอบเป็นภาษาไทยสั้นๆ สุภาพ และเป็นกันเอง ห้ามระบุชื่อโมเดลเบื้องหลัง
+    // ⚡ ปรับ Prompt ให้เน้นความกระชับและ "จบประโยคให้สมบูรณ์"
+    const systemPrompt = `
+      คุณคือ TrueX AI ผู้ช่วยอัจฉริยะ วิเคราะห์ AQI: ${aqi} และ Temp: ${temp}°C 
+      ตอบเป็นภาษาไทยที่จริงใจ เป็นกันเอง และ "ต้องจบประโยคให้สมบูรณ์" 
+      ห้ามใส่หัวข้อ ห้ามมีเครื่องหมาย [] เน้นสรุปสั้นๆ ใน 1-2 ประโยค 
+      เช่น "อากาศดีมากครับ AQI ${aqi} กับอุณหภูมิ ${temp}°C กำลังสบาย ออกไปเดินเล่นได้เลยครับ"
     `;
 
     const response = await hf.chatCompletion({
       model: "meta-llama/Meta-Llama-3-8B-Instruct",
-      messages: [
-        { role: "system", content: systemContext },
-        { role: "user", content: userQuestion || "ช่วยวิเคราะห์สถานะอากาศจากตำแหน่งปัจจุบันของฉันหน่อย" }
-      ],
-      max_tokens: 250,
-      temperature: 0.7, // ปรับให้คำตอบมีความหลากหลายขึ้นนิดหน่อย
+      messages: [{ role: "system", content: systemPrompt }],
+      max_tokens: 150, // เพิ่มจาก 100 เป็น 150 เพื่อให้ AI มีพื้นที่พิมพ์จนจบประโยค
+      temperature: 0.5, // ลดความเพ้อเจ้อลง เพื่อให้ตอบตรงประเด็นและสั้นลง
     });
 
-    const aiMessage = response.choices[0].message.content;
+    const result = response.choices[0].message.content;
+    
+    // Clean ข้อมูลเผื่อมีขยะหลุดมา
+    const cleanResult = result?.replace(/\[.*?\]/g, "").trim();
 
-    return NextResponse.json({ analysis: aiMessage });
-  } catch (error: any) {
-    console.error("AI API Error:", error);
-    return NextResponse.json({ message: "AI Connection Error" }, { status: 500 });
+    return NextResponse.json({ analysis: cleanResult });
+
+  } catch (error) {
+    return NextResponse.json({ analysis: "ขออภัยครับ ระบบ AI ขัดข้องเล็กน้อย แต่สภาพอากาศโดยรวมยังปกติครับ" }, { status: 500 });
   }
 }
