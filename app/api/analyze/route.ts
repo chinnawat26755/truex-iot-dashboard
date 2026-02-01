@@ -1,3 +1,4 @@
+export const runtime = 'edge'; // ⚡ เพิ่มบรรทัดนี้ครับ
 import { HfInference } from "@huggingface/inference";
 import { NextResponse } from "next/server";
 
